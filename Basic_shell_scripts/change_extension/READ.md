@@ -1,0 +1,1 @@
+*[This is a basic script that takes three parameters, an absolute path and two extensions (ext1 and ext2), it searches for any occurence of ext1 in the path given and changes to the ext2*]

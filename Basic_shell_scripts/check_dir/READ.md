@@ -1,0 +1,1 @@
+*This is a basic script that takes a parameter of an absolute path and checks if it exists on the* **linux file system** 
