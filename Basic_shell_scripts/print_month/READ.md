@@ -1,0 +1,1 @@
+This script takes a parameter (number equal to or less than 12) and provides the corresponding month
