@@ -1,0 +1,1 @@
+This is a script that deploys the LAMP stack on Ubuntu and Centos distributions, it is interactive and would only pull php files from **GitHub**; user would be asked to provide port number and web service would be deployed using virtual hosts.
