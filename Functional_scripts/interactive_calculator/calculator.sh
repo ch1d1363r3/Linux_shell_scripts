@@ -1,3 +1,4 @@
+#!/bin/bash
 function print_color(){
     case $1 in 
     red) color=$(tput setaf 1) ;;

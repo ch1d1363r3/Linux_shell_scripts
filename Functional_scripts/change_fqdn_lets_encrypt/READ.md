@@ -1,0 +1,1 @@
+This is a script to automate fully qualified domain name change for an Ubuntu server running vicidial with asterisk engine

@@ -1,0 +1,1 @@
+This is a functional calculator script that is interactive and carries out basic arithmetic computattions
