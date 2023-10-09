@@ -1,17 +1,45 @@
 #!/bin/bash
 function main(){
         function print_color(){
-                        case $1 in
-                        green) color=$(tput setaf 2) ;;
-                        red) color=$(tput setaf 1) ;;
-                        blue) color=$(tput setaf 4);;
-                        yellow) color=$(tput setaf 3);;
-                        esac
-                        echo -e "${color} $2 $(tput sgr0)"
+                case $1 in
+                green) color=$(tput setaf 2) ;;
+                red) color=$(tput setaf 1) ;;
+                blue) color=$(tput setaf 4);;
+                yellow) color=$(tput setaf 3);;
+                esac
+                echo -e "${color} $2 $(tput sgr0)"
         }
         function get_distro(){
-                        DISTRO=$( cat /etc/*-release | tr [:upper:] [:lower:] | grep -Poi '(ubuntu|centos)' | uniq )
-                        echo $DISTRO
+                DISTRO=$( cat /etc/*-release | tr [:upper:] [:lower:] | grep -Poi '(ubuntu|centos)' | uniq )
+                echo $DISTRO
+        }
+        function db_setup(){
+                print_color "blue" " Now setting up Database ..." #creating database and user, use database host address in place of localhost multi tier deployment
+                sudo cat > db_conf.sql <<-EOF
+                CREATE DATABASE $db_name;
+                CREATE USER '$db_name'@'localhost' IDENTIFIED BY '$passwd';
+                GRANT ALL PRIVILEGES ON $db_name.* TO '$db_name'@'localhost';
+                FLUSH PRIVILEGES;
+EOF
+                sudo mysql < db_conf.sql
+                print_color "blue" " Now Loading Database ..."
+                #sample script for loading database
+                #sudo cat > $db_loader <<-EOF
+                #USE $db_name;
+                #CREATE TABLE products (id mediumint(8) unsigned NOT NULL auto_increment,Name varchar(255) default NULL,Price varchar(255) default NULL, ImageUrl varchar(255) default NULL,PRIMARY KEY (id)) AUTO_INCREMENT=1;
+                #INSERT INTO products (Name,Price,ImageUrl) VALUES ("Laptop","100","c-1.png"),("Drone","200","c-2.png"),("VR","300","c-3.png"),("Tablet","50","c-5.png"),("Watch","90","c-6.png"),("Phone Covers","20","c-7.png"),("Phone","80","c-8.png"),("Laptop","150","c-4.png");
+#EOF 
+                sudo mysql < $db_load_path
+                print_color "yellow" " ====================================================================="
+                print_color "green" " Database setup and configuration is now COMPLETE !!! "
+                print_color "yellow" " ====================================================================="
+
+        }
+        function edit_php_link(){
+                sudo sed -i "s/ecomuser/$db_name/g" /var/www/sites/$domain/index.php #insert database user into link section in php index file using stream editor
+                sudo sed -i "s/ecomdb/$db_name/g" /var/www/sites/$domain/index.php #insert database name into link section in php index file using stream editor
+                sudo sed -i "s/ecompassword/$passwd/g" /var/www/sites/$domain/index.php #insert password into link section of php link file using stream editor
+                sudo sed -i "s/172.20.1.101/localhost/g" /var/www/sites/$domain/index.php #set host for database using stream editor
         }
         function ubuntu_installer(){
                 print_color "yellow" "... Now Updating repo list and packages"
@@ -25,33 +53,12 @@ function main(){
                 sudo ufw allow in $port_no
                 sudo ufw reload
                 print_color "green" " Firewall Setup now complete ... "
-                print_color "green" " _____________________________________________________________________"
-                print_color "green" " _____________________________________________________________________"
-                print_color "blue" " Now setting up Database ..."
+                print_color "green" " =====================================================================\n"
+                #setting up and loading database using by calling db_setup function
                 print_color "yellow" "Starting Mysql Server.."
                 sudo service mysql start
                 sudo systemctl enable mysql
-                cat > db_conf.sql <<-EOF
-                CREATE DATABASE $db_name;
-                CREATE USER '$sql_user'@'localhost' IDENTIFIED BY '$passwd';
-                GRANT ALL PRIVILEGES ON $db_name.* TO '$sql_user'@'localhost';
-                FLUSH PRIVILEGES;
-EOF
-                sudo mysql < db_conf.sql
-                print_color "blue" " Now Loading Database ..."
-                sudo cat > $db_loader <<-EOF
-                USE $db_name;
-                CREATE TABLE products (id mediumint(8) unsigned NOT NULL auto_increment,Name varchar(255) default NULL,Price varchar(255) default NULL, ImageUrl varchar(255) default NULL,PRIMARY KEY (id)) AUTO_INCREMENT=1;
-                INSERT INTO products (Name,Price,ImageUrl) VALUES ("Laptop","100","c-1.png"),("Drone","200","c-2.png"),("VR","300","c-3.png"),("Tablet","50","c-5.png"),("Watch","90","c-6.png"),("Phone Covers","20","c-7.png"),("Phone","80","c-8.png"),("Laptop","150","c-4.png");
-EOF
-                sudo mysql < $db_loader
-                print_color "yellow" " _____________________________________________________________________"
-                print_color "yellow" " _____________________________________________________________________"
-                print_color "green" " Database setup and configuration is now COMPLETE !!! "
-                print_color "yellow" " _____________________________________________________________________"
-                print_color "yellow" " _____________________________________________________________________\n"
-                print_color "green" " _____________________________________________________________________"
-                print_color "green" " _____________________________________________________________________"
+                db_setup
                 print_color "blue" " Now setting up Webserver ..."
                 sudo sed -i "s/index.html/index.php/g" /etc/apache2/apache2.conf
                 # Start apache2 service
@@ -61,10 +68,8 @@ EOF
                 print_color "green" "Installing Git..."
                 sudo apt install -y git
                 sudo git clone $git_path  /var/www/sites/$domain
-                sudo sed -i "s/ecomuser/$sql_user/g" /var/www/sites/$domain/index.php
-                sudo sed -i "s/ecomdb/$db_name/g" /var/www/sites/$domain/index.php
-                sudo sed -i "s/ecompassword/$passwd/g" /var/www/sites/$domain/index.php
-                sudo sed -i 's/172.20.1.101/localhost/g' /var/www/sites/$domain/index.php
+                edit_php_link
+                sudo sed -i "s|Listen 80 |Listen 80 \nListen $port_no|g" /etc/apache2/ports.conf
                 sudo cat > $domain.conf  <<-EOF
                 <VirtualHost *:$port_no>
                         ServerName $domain
@@ -84,11 +89,9 @@ EOF
                 sudo a2ensite $domain
                 sudo a2dissite 000-default
                 sudo systemctl reload apache2
-                print_color "yellow" " _____________________________________________________________________"
-                print_color "yellow" " _____________________________________________________________________"
+                print_color "yellow" " ====================================================================="
                 print_color "green" " Webserver setup and configuration is now COMPLETE !!! "
-                print_color "yellow" " _____________________________________________________________________"
-                print_color "yellow" " _____________________________________________________________________\n"
+                print_color "yellow" " =====================================================================\n"
         }
         function centos_installer(){
                 echo "---------------- Setup Database Server ------------------"
@@ -106,22 +109,7 @@ EOF
                 print_color "green" "Configuring FirewallD rules for database.."
                 sudo firewall-cmd --permanent --zone=public --add-port=3306/tcp
                 sudo firewall-cmd --reload
-                print_color "green" "Setting up database.."
-                cat > db_conf.sql <<-EOF
-                CREATE DATABASE $db_name;
-                CREATE USER '$sql_user'@'localhost' IDENTIFIED BY '$passwd';
-                GRANT ALL PRIVILEGES ON $db_name.* TO '$sql_user'@'localhost';
-                FLUSH PRIVILEGES;
-EOF
-                sudo mysql < db_conf.sql
-                print_color "blue" " Now Loading Database ..."
-                sudo cat > $db_loader <<-EOF
-                USE $db_name;
-                CREATE TABLE products (id mediumint(8) unsigned NOT NULL auto_increment,Name varchar(255) default NULL,Price varchar(255) default NULL, ImageUrl varchar(255) default NULL,PRIMARY KEY (id)) AUTO_INCREMENT=1;
-                INSERT INTO products (Name,Price,ImageUrl) VALUES ("Laptop","100","c-1.png"),("Drone","200","c-2.png"),("VR","300","c-3.png"),("Tablet","50","c-5.png"),("Watch","90","c-6.png"),("Phone Covers","20","c-7.png"),("Phone","80","c-8.png"),("Laptop","150","c-4.png");
-EOF
-                sudo mysql < $db_loader
-                print_color "green" "---------------- Setup Database Server - Finished ------------------"
+                db_setup
                 print_color "green" "---------------- Setup Web Server ------------------"
                 print_color "green" "Installing Web Server Packages .."
                 sudo yum install -y httpd php php-mysqlnd
@@ -138,12 +126,10 @@ EOF
                 sudo chown -R $USER:wheel /var/www/sites/$domain
                 sudo chmod -R 755 /var/www/
                 sudo git clone $git_path /var/www/sites/$domain
-                sudo sed -i "s/ecomuser/$sql_user/g" /var/www/sites/$domain/index.php
-                sudo sed -i "s/ecomdb/$db_name/g" /var/www/sites/$domain/index.php
-                sudo sed -i "s/ecompassword/$passwd/g" /var/www/sites/$domain/index.php
-                sudo sed -i 's/172.20.1.101/localhost/g' /var/www/sites/$domain/index.php
                 print_color "green" "Updating index.php.."
-                sudo sed -i 's/172.20.1.101/localhost/g' /var/www/sites/$domain/index.php
+                edit_php_link
+                sudo sed -i "s|Listen 80 |Listen 80 \nListen $port_no|g" /etc/httpd/conf/httpd.conf
+                print_color "blue" "Setting up virtual host"
                 sudo cat > $domain.conf  <<-EOF
                 <VirtualHost *:$port_no>
                         ServerName $domain
@@ -167,14 +153,11 @@ EOF
                 sudo systemctl restart httpd
                 print_color "green" "---------------- Setup Web Server - Finished ------------------"
         }
-        print_color "yellow" " _____________________________________________________________________"
-        print_color "green" " _____________________________________________________________________"
+        print_color "green" " ====================================================================="
         print_color "blue" " Welcome To The Great LAMP Stack Deployment tool Powered by Tchidi "
-        print_color "green" " _____________________________________________________________________"
-        print_color "yellow" " _____________________________________________________________________"
+        print_color "yellow" " ====================================================================="
         print_color "blue" " Kindly provide the following information correctly for configuration of LAMP Stack"
-        print_color "yellow" " _____________________________________________________________________"
-        print_color "yellow" " _____________________________________________________________________"
+        print_color "yellow" " ====================================================================="
         echo -e "1. Enter your preferred domain name \n"
         read domain
         echo -e "2. Enter your the preferred name for your Database \n"
@@ -187,8 +170,6 @@ EOF
         read port_no
         echo -e "6. Enter the absolute path to your script for loading Database"
         read db_load_path
-        sql_user=$(echo $USER)
-        db_loader=$(echo $db_load_path/"db_loader.sql")
         print_color "blue" "....Detecting Distro..."
         distro=$(get_distro)
         print_color "green" "---- $distro Detected ----"
