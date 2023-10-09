@@ -36,6 +36,7 @@ EOF
 
         }
         function edit_php_link(){
+                print_color "green" "Updating index.php.."
                 sudo sed -i "s/ecomuser/$db_name/g" /var/www/sites/$domain/index.php #insert database user into link section in php index file using stream editor
                 sudo sed -i "s/ecomdb/$db_name/g" /var/www/sites/$domain/index.php #insert database name into link section in php index file using stream editor
                 sudo sed -i "s/ecompassword/$passwd/g" /var/www/sites/$domain/index.php #insert password into link section of php link file using stream editor
@@ -126,7 +127,6 @@ EOF
                 sudo chown -R $USER:wheel /var/www/sites/$domain
                 sudo chmod -R 755 /var/www/
                 sudo git clone $git_path /var/www/sites/$domain
-                print_color "green" "Updating index.php.."
                 edit_php_link
                 sudo sed -i "s|Listen 80 |Listen 80 \nListen $port_no|g" /etc/httpd/conf/httpd.conf
                 print_color "blue" "Setting up virtual host"
